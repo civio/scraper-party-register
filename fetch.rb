@@ -5,9 +5,12 @@
 require 'mechanize'
 require 'csv'
 
+# Allow overriding of starting id from command line
+start_id = ARGV[0] ? ARGV[0].to_i : 1
+
 agent = Mechanize.new
 
-1.upto(6000) do |id|
+start_id.upto(6000) do |id|
   puts "Fetching party #{id}..."
 
   # Read index page, just so the id is set in the session (who makes these websites?!)
