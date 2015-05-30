@@ -8,11 +8,13 @@ def get_field(page, field)
 end
 
 4198.upto(4199) do |id|
+  puts "Fetchin party #{id}..."
+
   # Read index page, just so the id is set in the session (who makes these websites?!)
-  agent.get("https://servicio.mir.es/nfrontal/webpartido_politico/partido_politicoDatos.html?nmformacion=#{id}")
+  agent.get("http://servicio.mir.es/nfrontal/webpartido_politico/partido_politicoDatos.html?nmformacion=#{id}")
 
   # Now we can get the page with the actual info, which now will have the party details
-  page = agent.get("https://servicio.mir.es/nfrontal/webpartido_politico/recurso/partido_politicoDetalle.html")
+  page = agent.get("http://servicio.mir.es/nfrontal/webpartido_politico/recurso/partido_politicoDetalle.html")
 
   # Parse the page
   data = {}
