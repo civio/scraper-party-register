@@ -1,9 +1,11 @@
+# Argh, the official web site seems to be rejecting connections from Morph.io...
+
 require 'scraperwiki'
 require 'mechanize'
 
 agent = Mechanize.new
 
-def get_field(page, field)
+def getField(page, field)
   page.search(field).text.strip
 end
 
