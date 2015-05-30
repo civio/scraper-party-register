@@ -1,7 +1,7 @@
 # Argh, the official web site seems to be rejecting connections from Morph.io...
 
-require 'scraperwiki'
 require 'mechanize'
+require 'csv'
 
 agent = Mechanize.new
 
@@ -9,8 +9,29 @@ def getField(page, field)
   page.search(field).text.strip
 end
 
+puts CSV::generate_line([
+    "id",
+    "party_type",
+    "short_name",
+    "name",
+    "register_date",
+    "address",
+    "town",
+    "region",
+    "phone_number",
+    "phone_number_extra",
+    "fax_number",
+    "email",
+    "web",
+    "comments",
+    "party_scope",
+    "president",
+    "secretary_general",
+    "other_names"
+  ])
+
 4198.upto(4199) do |id|
-  puts "Fetching party #{id}..."
+  # puts "Fetching party #{id}..."
 
   # Read index page, just so the id is set in the session (who makes these websites?!)
   agent.get("http://servicio.mir.es/nfrontal/webpartido_politico/partido_politicoDatos.html?nmformacion=#{id}")
@@ -19,25 +40,80 @@ end
   page = agent.get("http://servicio.mir.es/nfrontal/webpartido_politico/recurso/partido_politicoDetalle.html")
 
   # Parse the page
-  data = {}
-  data["id"] = id
-  data["party_type"] = getField(page, "#tipoFormacion")
-  data["short_name"] = getField(page, "#siglas")
-  data["name"] = getField(page, "#nombre")
-  data["register_date"] = getField(page, "#fecInscripcion")
-  data["address"] = getField(page, "#domicilioSocial")
-  data["town"] = getField(page, "#poblacion")
-  data["region"] = getField(page, "#autonomia")
-  data["phone_number"] = getField(page, "#telefono1")
-  data["phone_number_extra"] = getField(page, "#telefono2")
-  data["fax_number"] = getField(page, "#fax")
-  data["email"] = getField(page, "#email")
-  data["web"] = getField(page, "#paginaweb")
+  party_type = getField(page, "#tipoFormacion")
+  short_name = getField(page, "#siglas")
+  name = getField(page, "#nombre")
+  register_date = getField(page, "#fecInscripcion")
+  address = getField(page, "#domicilioSocial")
+  town = getField(page, "#poblacion").gsub(/[\n\t]+/, '')
+  region = getField(page, "#autonomia")
+  phone_number = getField(page, "#telefono1")
+  phone_number_extra = getField(page, "#telefono2")
+  fax_number = getField(page, "#fax")
+  email = getField(page, "#email")
+  web = getField(page, "#paginaweb")
+  comments = getField(page, "#observaciones")
 
   # FIXME: Pictures are tricky
   # picture = page.search("#simbolo img")[0]
   # if picture
 
-  # Write out to the sqlite database using scraperwiki library
-  ScraperWiki.save_sqlite(["id"], data)
+  # Retrieve party leaders: there are a variable number of fields
+  roles = {}
+  page.search('#promotor').each do |leader|
+    role = leader.previous.content
+    roles[role] = leader.content.strip
+
+    if role != 'Presidente' and role != 'Secretario General'
+      puts "Party #{id}. Unknown role found: #{role}"
+    end
+  end
+
+  # Getting the scope of the party or previous names is horrifying,
+  # we have to use the h1 headings to navigate around the page *sigh*
+  headings = page.search('h1')
+  party_scope = ''
+  other_names = ''
+  headings.each do |heading|
+    heading_text = heading.content.strip
+
+    next if heading_text =~ /Información/                  # We've got that already
+    next if heading_text =~ /Representantes Legales/       # ...
+
+    if heading_text =~ /Ámbito Territorial/
+      party_scope = heading.next.next.content.strip   # *sigh*
+      next
+    end
+
+    if heading_text =~ /Denominaciones Múltiples/
+      other_names = heading.next.next.content.strip   # *sigh*
+      next
+    end
+
+    # If we get here it means there's a type of heading we don't know about
+    puts "WARNING: Unexpected heading ('#{heading_text}') found for party #{id}"
+  end
+
+
+  # Output results
+  puts CSV::generate_line([
+      id,
+      party_type,
+      short_name,
+      name,
+      register_date,
+      address,
+      town,
+      region,
+      phone_number,
+      phone_number_extra,
+      fax_number,
+      email,
+      web,
+      comments,
+      party_scope,
+      roles['Presidente'],
+      roles['Secretario General'],
+      other_names
+    ])
 end
