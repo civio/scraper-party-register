@@ -1,2 +1,1 @@
-# Ignore output of scraper
-data.sqlite
+staging/*html

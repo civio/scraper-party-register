@@ -1,15 +1,25 @@
 # Parse the official party register and writes parsed data into 'partidos.csv'.
-# (I tend to output to terminal, but in this case it's good to have progress updates there.)
+# (I tend to output to terminal, but in this case it's good to have progress updates there,
+# plus some fields are too big to make sense on the terminal.)
 
 # Argh, the official web site seems to be rejecting connections from Morph.io...
 
-require 'mechanize'
+require 'nokogiri'
 require 'csv'
-
-agent = Mechanize.new
 
 def getField(page, field)
   page.search(field).text.strip
+end
+
+def getHeadingContent(heading)
+  # Try the next DOM element
+  content = heading.next.content.strip
+
+  # Sometimes it's a new line, so we pick the next one
+  # TODO: Shall we keep going? I don't know
+  content = heading.next.next.content.strip if content.empty?
+
+  content
 end
 
 party_data = CSV.open('partidos.csv', "w")
@@ -34,13 +44,15 @@ party_data << [
   ]
 
 1.upto(6000) do |id|
-  puts "Fetching party #{id}..."
-
-  # Read index page, just so the id is set in the session (who makes these websites?!)
-  agent.get("http://servicio.mir.es/nfrontal/webpartido_politico/partido_politicoDatos.html?nmformacion=#{id}")
-
-  # Now we can get the page with the actual info, which now will have the party details
-  page = agent.get("http://servicio.mir.es/nfrontal/webpartido_politico/recurso/partido_politicoDetalle.html")
+  # Read pre-fetched page
+  puts "Parsing party #{id}..."
+  begin
+    input = File.open("staging/#{id}.html")
+  rescue Errno::ENOENT => e
+    puts "Skipping #{id}: file not found"
+    next
+  end
+  page = Nokogiri::HTML(input)
 
   # Parse the page
   party_type = getField(page, "#tipoFormacion")
@@ -68,10 +80,10 @@ party_data << [
 
   # Retrieve party leaders: there are a variable number of fields, and some of them
   # appear multiple times
-  roles = {}
+  roles = []
   page.search('#promotor').each do |leader|
     role = leader.previous.content
-    roles[role] = leader.content.strip
+    roles << { role: role, name: leader.content.strip }
   end
 
   # Getting the scope of the party or previous names is horrifying,
@@ -86,12 +98,12 @@ party_data << [
     next if heading_text =~ /Representantes Legales/       # ...
 
     if heading_text =~ /Ámbito Territorial/
-      party_scope = heading.next.next.content.strip   # *sigh*
+      party_scope = getHeadingContent(heading)
       next
     end
 
     if heading_text =~ /Denominaciones Múltiples/
-      other_names = heading.next.next.content.strip   # *sigh*
+      other_names = getHeadingContent(heading)
       next
     end
 
