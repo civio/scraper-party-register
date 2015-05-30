@@ -1,25 +1,39 @@
-# This is a template for a Ruby scraper on morph.io (https://morph.io)
-# including some code snippets below that you should find helpful
+require 'scraperwiki'
+require 'mechanize'
 
-# require 'scraperwiki'
-# require 'mechanize'
-#
-# agent = Mechanize.new
-#
-# # Read in a page
-# page = agent.get("http://foo.com")
-#
-# # Find somehing on the page using css selectors
-# p page.at('div.content')
-#
-# # Write out to the sqlite database using scraperwiki library
-# ScraperWiki.save_sqlite(["name"], {"name" => "susan", "occupation" => "software developer"})
-#
-# # An arbitrary query against the database
-# ScraperWiki.select("* from data where 'name'='peter'")
+agent = Mechanize.new
 
-# You don't have to do things with the Mechanize or ScraperWiki libraries.
-# You can use whatever gems you want: https://morph.io/documentation/ruby
-# All that matters is that your final data is written to an SQLite database
-# called "data.sqlite" in the current working directory which has at least a table
-# called "data".
+def get_field(page, field)
+  page.search(field).text.strip
+end
+
+4198.upto(4199) do |id|
+  # Read index page, just so the id is set in the session (who makes these websites?!)
+  agent.get("https://servicio.mir.es/nfrontal/webpartido_politico/partido_politicoDatos.html?nmformacion=#{id}")
+
+  # Now we can get the page with the actual info, which now will have the party details
+  page = agent.get("https://servicio.mir.es/nfrontal/webpartido_politico/recurso/partido_politicoDetalle.html")
+
+  # Parse the page
+  data = {}
+  data["id"] = id
+  data["party_type"] = getField(page, "#tipoFormacion")
+  data["short_name"] = getField(page, "#siglas")
+  data["name"] = getField(page, "#nombre")
+  data["register_date"] = getField(page, "#fecInscripcion")
+  data["address"] = getField(page, "#domicilioSocial")
+  data["town"] = getField(page, "#poblacion")
+  data["region"] = getField(page, "#autonomia")
+  data["phone_number"] = getField(page, "#telefono1")
+  data["phone_number_extra"] = getField(page, "#telefono2")
+  data["fax_number"] = getField(page, "#fax")
+  data["email"] = getField(page, "#email")
+  data["web"] = getField(page, "#paginaweb")
+
+  # FIXME: Pictures are tricky
+  # picture = page.search("#simbolo img")[0]
+  # if picture
+
+  # Write out to the sqlite database using scraperwiki library
+  ScraperWiki.save_sqlite(["id"], data)
+end
