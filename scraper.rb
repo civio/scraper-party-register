@@ -1,3 +1,6 @@
+# Parse the official party register and writes parsed data into 'partidos.csv'.
+# (I tend to output to terminal, but in this case it's good to have progress updates there.)
+
 # Argh, the official web site seems to be rejecting connections from Morph.io...
 
 require 'mechanize'
@@ -9,7 +12,8 @@ def getField(page, field)
   page.search(field).text.strip
 end
 
-puts CSV::generate_line([
+party_data = CSV.open('partidos.csv', "w")
+party_data << [
     "id",
     "party_type",
     "short_name",
@@ -25,13 +29,12 @@ puts CSV::generate_line([
     "web",
     "comments",
     "party_scope",
-    "president",
-    "secretary_general",
+    "roles",
     "other_names"
-  ])
+  ]
 
-4198.upto(4199) do |id|
-  # puts "Fetching party #{id}..."
+1.upto(6000) do |id|
+  puts "Fetching party #{id}..."
 
   # Read index page, just so the id is set in the session (who makes these websites?!)
   agent.get("http://servicio.mir.es/nfrontal/webpartido_politico/partido_politicoDatos.html?nmformacion=#{id}")
@@ -41,6 +44,11 @@ puts CSV::generate_line([
 
   # Parse the page
   party_type = getField(page, "#tipoFormacion")
+  if party_type.empty?   # We got an empty page, skip
+    puts "Skipping"
+    next
+  end
+
   short_name = getField(page, "#siglas")
   name = getField(page, "#nombre")
   register_date = getField(page, "#fecInscripcion")
@@ -58,15 +66,12 @@ puts CSV::generate_line([
   # picture = page.search("#simbolo img")[0]
   # if picture
 
-  # Retrieve party leaders: there are a variable number of fields
+  # Retrieve party leaders: there are a variable number of fields, and some of them
+  # appear multiple times
   roles = {}
   page.search('#promotor').each do |leader|
     role = leader.previous.content
     roles[role] = leader.content.strip
-
-    if role != 'Presidente' and role != 'Secretario General'
-      puts "Party #{id}. Unknown role found: #{role}"
-    end
   end
 
   # Getting the scope of the party or previous names is horrifying,
@@ -96,7 +101,7 @@ puts CSV::generate_line([
 
 
   # Output results
-  puts CSV::generate_line([
+  party_data << [
       id,
       party_type,
       short_name,
@@ -112,8 +117,7 @@ puts CSV::generate_line([
       web,
       comments,
       party_scope,
-      roles['Presidente'],
-      roles['Secretario General'],
+      roles,
       other_names
-    ])
+    ]
 end
